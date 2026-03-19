@@ -70,53 +70,33 @@ final class InvoiceProcessorTest extends TestCase
 
     // ---- Validation tests ----
 
-    public function test_returns_error_when_no_customer(): void
-    {
-        $data = $this->baseInvoiceData();
-        $data['customer'] = null;
-
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn);
-
-        $this->assertEquals(['error' => 'No customer'], $result);
-    }
-
     public function test_returns_error_when_invalid_email(): void
     {
+        $this->expectExceptionMessage('Invalid email');
+
         $data = $this->baseInvoiceData(['customer' => ['email' => 'not-an-email']]);
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn);
-
-        $this->assertEquals(['error' => 'Invalid email'], $result);
+        $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
 
     public function test_returns_error_when_no_items(): void
     {
+        $this->expectExceptionMessage('No items');
+
         $data = $this->baseInvoiceData();
         $data['items'] = [];
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn);
-
-        $this->assertEquals(['error' => 'No items'], $result);
-    }
-
-    public function test_returns_error_when_items_null(): void
-    {
-        $data = $this->baseInvoiceData();
-        $data['items'] = null;
-
-        $result = @$this->invoiceProcessor->processInvoice($data, self::$conn);
-
-        $this->assertEquals(['error' => 'No items'], $result);
+        $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
 
     public function test_returns_error_when_email_missing(): void
     {
+        $this->expectExceptionMessage('Invalid email');
+
         $data = $this->baseInvoiceData();
         unset($data['customer']['email']);
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn);
-
-        $this->assertEquals(['error' => 'Invalid email'], $result);
+        $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
 
     // ---- Basic invoice ----

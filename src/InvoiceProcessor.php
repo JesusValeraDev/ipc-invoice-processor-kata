@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App;
 
+use InvalidArgumentException;
+
 final class InvoiceProcessor
 {
     const float TAX_RATE = 0.21;
@@ -26,18 +28,7 @@ final class InvoiceProcessor
         $customer = $invoiceData['customer'];
         $items = $invoiceData['items'];
 
-        // Validate
-        if ($customer == null) {
-            return ['error' => 'No customer'];
-        }
-
-        if (!isset($customer['email']) || !filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
-            return ['error' => 'Invalid email'];
-        }
-
-        if ($items == null || count($items) == 0) {
-            return ['error' => 'No items'];
-        }
+        $this->validate($customer, $items);
 
         // Calculate subtotal
         $subtotal = 0;
@@ -158,5 +149,24 @@ final class InvoiceProcessor
             'total' => $total,
             'output' => $output,
         ];
+    }
+
+    /**
+     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
+     * @param list<array{name: string, qty: int, price: float}> $items
+     */
+    private function validate(array $customer, array $items): void
+    {
+        if ($customer == null) {
+            throw new InvalidArgumentException('No customer');
+        }
+
+        if (!isset($customer['email']) || !filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('Invalid email');
+        }
+
+        if ($items == null || count($items) == 0) {
+            throw new InvalidArgumentException('No items');
+        }
     }
 }
