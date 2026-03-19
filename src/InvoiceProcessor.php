@@ -36,68 +36,7 @@ final class InvoiceProcessor
             $conn, $customer, $subtotal, $tax, $shipping, $total, $items
         );
 
-        // Generate output
-        if ($format == 'html') {
-            $output = '<div class="invoice">';
-            $output .= '<h1>Invoice ' . $invoiceNumber . '</h1>';
-            $output .= '<div class="customer">';
-            $output .= '<p>' . htmlspecialchars($customer['name']) . '</p>';
-            $output .= '<p>' . htmlspecialchars($customer['email']) . '</p>';
-            if (isset($customer['address'])) {
-                $output .= '<p>' . htmlspecialchars($customer['address']['street']) . '</p>';
-                $output .= '<p>' . htmlspecialchars($customer['address']['city'])
-                    . ', ' . htmlspecialchars($customer['address']['zip']) . '</p>';
-            }
-            $output .= '</div>';
-            $output .= '<table class="items">';
-            $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
-            foreach ($items as $item) {
-                $output .= '<tr>';
-                $output .= '<td>' . htmlspecialchars($item['name']) . '</td>';
-                $output .= '<td>' . $item['qty'] . '</td>';
-                $output .= '<td>' . number_format($item['price'], 2) . ' EUR</td>';
-                $output .= '<td>' . number_format($item['qty'] * $item['price'], 2) . ' EUR</td>';
-                $output .= '</tr>';
-            }
-            $output .= '</table>';
-            $output .= '<div class="totals">';
-            $output .= '<p>Subtotal: ' . number_format($subtotal, 2) . ' EUR</p>';
-            $output .= '<p>Tax (21%): ' . number_format($tax, 2) . ' EUR</p>';
-            if ($shipping > 0) {
-                $output .= '<p>Shipping: ' . number_format($shipping, 2) . ' EUR</p>';
-            }
-            $output .= '<p class="total"><strong>Total: ' . number_format($total, 2) . ' EUR</strong></p>';
-            $output .= '</div>';
-            $output .= '</div>';
-        } elseif ($format == 'json') {
-            $output = json_encode([
-                'invoice_number' => $invoiceNumber,
-                'customer' => $customer,
-                'items' => $items,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'shipping' => $shipping,
-                'total' => $total
-            ]);
-        } elseif ($format == 'text') {
-            $output = "INVOICE: $invoiceNumber\n";
-            $output .= "========================\n";
-            $output .= "Customer: " . $customer['name'] . "\n";
-            $output .= "Email: " . $customer['email'] . "\n\n";
-            $output .= "Items:\n";
-            foreach ($items as $item) {
-                $output .= "- " . $item['name'] . " x" . $item['qty'] . " @ " . $item['price'] . " = " . ($item['qty'] * $item['price']) . " EUR\n";
-            }
-            $output .= "\nSubtotal: $subtotal EUR\n";
-            $output .= "Tax: $tax EUR\n";
-            if ($shipping > 0) {
-                $output .= "Shipping: $shipping EUR\n";
-            }
-            $output .= "========================\n";
-            $output .= "TOTAL: $total EUR\n";
-        } else {
-            $output = '';
-        }
+        $output = $this->render($format, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total);
 
         return [
             'success' => true,
@@ -255,5 +194,89 @@ SQL;
 
             mysqli_query($conn, $sql);
         }
+    }
+
+    /**
+     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
+     * @param list<array{name: string, qty: int, price: float}> $items
+     */
+    private function render(
+        string $format,
+        string $invoiceNumber,
+        array $customer,
+        array $items,
+        float $subtotal,
+        float $tax,
+        float $shipping,
+        float $total
+    ): string {
+        if ($format == 'html') {
+            $output = '<div class="invoice">';
+            $output .= '<h1>Invoice ' . $invoiceNumber . '</h1>';
+            $output .= '<div class="customer">';
+            $output .= '<p>' . htmlspecialchars($customer['name']) . '</p>';
+            $output .= '<p>' . htmlspecialchars($customer['email']) . '</p>';
+            if (isset($customer['address'])) {
+                $output .= '<p>' . htmlspecialchars($customer['address']['street']) . '</p>';
+                $output .= '<p>' . htmlspecialchars($customer['address']['city'])
+                    . ', ' . htmlspecialchars($customer['address']['zip']) . '</p>';
+            }
+            $output .= '</div>';
+            $output .= '<table class="items">';
+            $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
+            foreach ($items as $item) {
+                $output .= '<tr>';
+                $output .= '<td>' . htmlspecialchars($item['name']) . '</td>';
+                $output .= '<td>' . $item['qty'] . '</td>';
+                $output .= '<td>' . number_format($item['price'], 2) . ' EUR</td>';
+                $output .= '<td>' . number_format($item['qty'] * $item['price'], 2) . ' EUR</td>';
+                $output .= '</tr>';
+            }
+            $output .= '</table>';
+            $output .= '<div class="totals">';
+            $output .= '<p>Subtotal: ' . number_format($subtotal, 2) . ' EUR</p>';
+            $output .= '<p>Tax (21%): ' . number_format($tax, 2) . ' EUR</p>';
+            if ($shipping > 0) {
+                $output .= '<p>Shipping: ' . number_format($shipping, 2) . ' EUR</p>';
+            }
+            $output .= '<p class="total"><strong>Total: ' . number_format($total, 2) . ' EUR</strong></p>';
+            $output .= '</div>';
+            $output .= '</div>';
+
+            return $output;
+        }
+
+        if ($format == 'json') {
+            return (string) json_encode([
+                'invoice_number' => $invoiceNumber,
+                'customer' => $customer,
+                'items' => $items,
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'shipping' => $shipping,
+                'total' => $total
+            ]);
+        }
+
+        if ($format == 'text') {
+            $output = "INVOICE: $invoiceNumber\n";
+            $output .= "========================\n";
+            $output .= "Customer: " . $customer['name'] . "\n";
+            $output .= "Email: " . $customer['email'] . "\n\n";
+            $output .= "Items:\n";
+            foreach ($items as $item) {
+                $output .= "- " . $item['name'] . " x" . $item['qty'] . " @ " . $item['price'] . " = " . ($item['qty'] * $item['price']) . " EUR\n";
+            }
+            $output .= "\nSubtotal: $subtotal EUR\n";
+            $output .= "Tax: $tax EUR\n";
+            if ($shipping > 0) {
+                $output .= "Shipping: $shipping EUR\n";
+            }
+            $output .= "========================\n";
+            $output .= "TOTAL: $total EUR\n";
+            return $output;
+        }
+
+        return '';
     }
 }
