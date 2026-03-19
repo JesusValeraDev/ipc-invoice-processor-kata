@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Domain\Model\Address;
+use App\Domain\Model\Customer;
 use App\Domain\Model\LineItem;
 use App\InvoiceProcessor;
 use PHPUnit\Framework\TestCase;
@@ -43,12 +44,12 @@ final class InvoiceProcessorTest extends TestCase
     private function baseInvoiceData(array $overrides = []): array
     {
         $data = [
-            'customer' => [
-                'id' => 42,
-                'name' => 'Jane Smith',
-                'email' => 'jane.smith@example.com',
-                'address' => new Address(street: 'Prinsengracht 123', city:  'Amsterdam', zipCode:  '1015 DT'),
-            ],
+            'customer' => new Customer(
+                id: 42,
+                name: 'Jane Smith',
+                email: 'jane.smith@example.com',
+                address: new Address(street: 'Prinsengracht 123', city:  'Amsterdam', zipCode:  '1015 DT'),
+            ),
             'items' => [
                 new LineItem('Mechanical Keyboard', 1, 149.99),
                 new LineItem('USB-C Cable', 3, 12.50),
@@ -72,7 +73,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $this->expectExceptionMessage('Invalid email');
 
-        $data = $this->baseInvoiceData(['customer' => ['email' => 'not-an-email']]);
+        $data = $this->baseInvoiceData(['customer' => new Customer(id: 42, name: 'John', email: 'not-an-email')]);
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -92,7 +93,7 @@ final class InvoiceProcessorTest extends TestCase
         $this->expectExceptionMessage('Invalid email');
 
         $data = $this->baseInvoiceData();
-        unset($data['customer']['email']);
+        unset($data['customer']->email);
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -299,7 +300,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_html_output_without_address(): void
     {
         $data = $this->baseInvoiceData();
-        unset($data['customer']['address']);
+        unset($data['customer']->address);
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
 

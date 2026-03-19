@@ -9,12 +9,12 @@ if (!$conn) {
 
 // Invoice data
 $invoiceData = [
-    'customer' => [
-        'id' => 42,
-        'name' => 'Jane Smith',
-        'email' => 'jane.smith@example.com',
-        'address' => new \App\Domain\Model\Address(street: 'Prinsengracht 123', city: 'Amsterdam', zipCode: '1015 DT'),
-    ],
+    'customer' => new \App\Domain\Model\Customer(
+        id: 42,
+        name: 'Jane Smith',
+        email: 'jane.smith@example.com',
+        address: new \App\Domain\Model\Address(street: 'Prinsengracht 123', city: 'Amsterdam', zipCode: '1015 DT'),
+    ),
     'items' => [
         new \App\Domain\Model\LineItem('Mechanical Keyboard', 1, 149.99),
         new \App\Domain\Model\LineItem('USB-C Cable', 3, 12.50),
@@ -25,8 +25,8 @@ $invoiceData = [
 // Run the demo
 echo "=== Invoice Processing Demo ===\n\n";
 
-echo "Customer: {$invoiceData['customer']['name']}\n";
-echo "Email: {$invoiceData['customer']['email']}\n\n";
+echo "Customer: {$invoiceData['customer']->name}\n";
+echo "Email: {$invoiceData['customer']->email}\n\n";
 
 echo "Items:\n";
 /** @var \App\Domain\Model\LineItem $item */

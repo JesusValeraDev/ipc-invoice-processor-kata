@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
-use App\Domain\Model\Address;
+use App\Domain\Model\Customer;
 use App\Domain\Model\LineItem;
 use InvalidArgumentException;
 
@@ -19,10 +19,7 @@ final class InvoiceProcessor
     const float SHIPPING_LARGE = 9.95;
 
     /**
-     * @param array{
-     *   customer: array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}},
-     *   items: list<LineItem>
-     * } $invoiceData
+     * @param array{customer: Customer, items: list<LineItem>} $invoiceData
      * @return array{success: true, invoice_number: string, invoice_id: int, total: float, output: string}
      */
     public function processInvoice(array $invoiceData, \mysqli $conn, string $format = 'html'): array
@@ -50,16 +47,11 @@ final class InvoiceProcessor
     }
 
     /**
-     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
      * @param list<LineItem> $items
      */
-    private function validate(array $customer, array $items): void
+    private function validate(Customer $customer, array $items): void
     {
-        if ($customer == null) {
-            throw new InvalidArgumentException('No customer');
-        }
-
-        if (!isset($customer['email']) || !filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
+        if (!isset($customer->email) || !filter_var($customer->email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Invalid email');
         }
 
@@ -132,13 +124,12 @@ final class InvoiceProcessor
     }
 
     /**
-     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
      * @param list<LineItem> $items
      * @return array{int, string, array, list<LineItem>, float, float, float, float}
      */
     private function save(
         \mysqli $conn,
-        array $customer,
+        Customer $customer,
         float $subtotal,
         float $tax,
         float $shipping,
@@ -157,13 +148,10 @@ final class InvoiceProcessor
         return 'INV-' . date('Ymd') . '-' . rand(1000, 9999);
     }
 
-    /**
-     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
-     */
     private function insertInvoice(
         \mysqli $conn,
         string $invoiceNumber,
-        array $customer,
+        Customer $customer,
         float $subtotal,
         float $tax,
         float $shipping,
@@ -171,7 +159,7 @@ final class InvoiceProcessor
     ): int {
         $sql = <<<SQL
 INSERT INTO invoices (invoice_number, customer_id, subtotal, tax, shipping, total, created_at)
-VALUES ('$invoiceNumber', {$customer['id']}, $subtotal, $tax, $shipping, $total, NOW())
+VALUES ('$invoiceNumber', $customer->id, $subtotal, $tax, $shipping, $total, NOW())
 SQL;
         mysqli_query($conn, $sql);
 
@@ -198,13 +186,12 @@ SQL;
     }
 
     /**
-     * @param array{id: int, name: string, email: string, address: Address} $customer
      * @param list<LineItem> $items
      */
     private function render(
         string $format,
         string $invoiceNumber,
-        array $customer,
+        Customer $customer,
         array $items,
         float $subtotal,
         float $tax,
@@ -215,10 +202,10 @@ SQL;
             $output = '<div class="invoice">';
             $output .= '<h1>Invoice ' . $invoiceNumber . '</h1>';
             $output .= '<div class="customer">';
-            $output .= '<p>' . htmlspecialchars($customer['name']) . '</p>';
-            $output .= '<p>' . htmlspecialchars($customer['email']) . '</p>';
-            if (isset($customer['address'])) {
-                $output .= '<p>' . nl2br(htmlspecialchars($customer['address']->formatted())) . '</p>';
+            $output .= '<p>' . htmlspecialchars($customer->name) . '</p>';
+            $output .= '<p>' . htmlspecialchars($customer->email) . '</p>';
+            if (isset($customer->address)) {
+                $output .= '<p>' . nl2br(htmlspecialchars($customer->address->formatted())) . '</p>';
             }
             $output .= '</div>';
             $output .= '<table class="items">';
@@ -260,8 +247,8 @@ SQL;
         if ($format == 'text') {
             $output = "INVOICE: $invoiceNumber\n";
             $output .= "========================\n";
-            $output .= "Customer: " . $customer['name'] . "\n";
-            $output .= "Email: " . $customer['email'] . "\n\n";
+            $output .= "Customer: " . $customer->name . "\n";
+            $output .= "Email: " . $customer->email . "\n\n";
             $output .= "Items:\n";
             foreach ($items as $item) {
                 $output .= "- " . $item->name . " x" . $item->quantity . " @ " . $item->unitPrice . " = " . $item->lineTotal() . " EUR\n";
