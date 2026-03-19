@@ -6,6 +6,14 @@ namespace App;
 
 final class InvoiceProcessor
 {
+    const float TAX_RATE = 0.21;
+
+    const int FREE_SHIPPING_THRESHOLD = 50;
+
+    const float SHIPPING_SMALL = 4.95;
+    const float SHIPPING_MEDIUM = 6.95;
+    const float SHIPPING_LARGE = 9.95;
+
     public function processInvoice($invoiceData, $conn, $format = 'html')
     {
         $customer = $invoiceData['customer'];
@@ -38,17 +46,15 @@ final class InvoiceProcessor
             $itemCount += $item['qty'];
         }
 
-        $tax = $subtotal * 0.21; // tax_rate
+        $tax = $subtotal * self::TAX_RATE;
 
-        // Shipping - free over 50 euros
-        $freeShippingThreshold = 50;
-        if ($subtotal >= $freeShippingThreshold) {
+        if ($subtotal >= self::FREE_SHIPPING_THRESHOLD) {
             $shipping = 0;
         } else {
             $shipping = match (true) {
-                $itemCount <= 2 => 4.95, // SHIPPING_SMALL
-                $itemCount <= 5 => 6.95, // SHIPPING_MEDIUM
-                default => 9.95, // SHIPPING_LARGE
+                $itemCount <= 2 => self::SHIPPING_SMALL,
+                $itemCount <= 5 => self::SHIPPING_MEDIUM,
+                default => self::SHIPPING_LARGE,
             };
         }
 
