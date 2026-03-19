@@ -30,29 +30,7 @@ final class InvoiceProcessor
 
         $this->validate($customer, $items);
 
-        // Calculate subtotal
-        $subtotal = 0;
-        $itemCount = 0;
-        foreach ($items as $item) {
-            $lineTotal = $item['qty'] * $item['price'];
-            $subtotal += $lineTotal;
-            $itemCount += $item['qty'];
-        }
-
-        $tax = $subtotal * self::TAX_RATE;
-
-        if ($subtotal >= self::FREE_SHIPPING_THRESHOLD) {
-            $shipping = 0;
-        } else {
-            $shipping = match (true) {
-                $itemCount <= 2 => self::SHIPPING_SMALL,
-                $itemCount <= 5 => self::SHIPPING_MEDIUM,
-                default => self::SHIPPING_LARGE,
-            };
-        }
-
-        $customerId = $customer['id'];
-        $total = $subtotal + $tax + $shipping;
+        [$subtotal, $tax, $shipping, $total] = $this->calculate($items);
 
         // Round to 2 decimals
         $total = round($total, 2);
@@ -62,6 +40,8 @@ final class InvoiceProcessor
 
         // Generate invoice number
         $invoiceNumber = 'INV-' . date('Ymd') . '-' . rand(1000, 9999);
+
+        $customerId = $customer['id'];
 
         // Save to database
         $insertInvoiceSql = "INSERT INTO invoices (invoice_number, customer_id, subtotal, tax, shipping, total, created_at)
@@ -168,5 +148,63 @@ final class InvoiceProcessor
         if ($items == null || count($items) == 0) {
             throw new InvalidArgumentException('No items');
         }
+    }
+
+    /**
+     * @param list<array{name: string, qty: int, price: float}> $items
+     * @return array{float, float, float, float}
+     */
+    private function calculate(array $items): array
+    {
+        $subtotal = $this->calculateSubtotal($items);
+        $itemCount = $this->totalQuantity($items);
+        $tax = $this->calculateTax($subtotal);
+        $shipping = $this->calculateShipping($subtotal, $itemCount);
+
+        $total = $subtotal + $tax + $shipping;
+
+        return [$subtotal, $tax, $shipping, $total];
+    }
+
+    /**
+     * @param list<array{name: string, qty: int, price: float}> $items
+     */
+    public function calculateSubtotal(array $items): float
+    {
+        return array_reduce(
+            array: $items,
+            callback: fn(float $sum, array $item) => $sum + ($item['qty'] * $item['price']),
+            initial: 0.0,
+        );
+    }
+
+    /**
+     * @param list<array{name: string, qty: int, price: float}> $items
+     */
+    public function totalQuantity(array $items): int
+    {
+        return array_reduce(
+            array: $items,
+            callback: fn(int $count, array $item) => $count + $item['qty'],
+            initial: 0,
+        );
+    }
+
+    private function calculateTax(float $subtotal): float
+    {
+        return $subtotal * self::TAX_RATE;
+    }
+
+    private function calculateShipping(float $subtotal, int $itemCount): float
+    {
+        if ($subtotal >= self::FREE_SHIPPING_THRESHOLD) {
+            return 0.0;
+        }
+
+        return match (true) {
+            $itemCount <= 2 => self::SHIPPING_SMALL,
+            $itemCount <= 5 => self::SHIPPING_MEDIUM,
+            default => self::SHIPPING_LARGE,
+        };
     }
 }
