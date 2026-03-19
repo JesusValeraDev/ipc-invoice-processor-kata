@@ -27,19 +27,14 @@ final class InvoiceProcessor
         $items = $invoiceData['items'];
 
         // Validate
-        if ($customer != null) {
-            if (isset($customer['email'])) {
-                if (!filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
-                    return ['error' => 'Invalid email'];
-                }
-            } else {
-                return ['error' => 'Invalid email'];
-            }
-        } else {
+        if ($customer == null) {
             return ['error' => 'No customer'];
         }
 
-        // Check items
+        if (!isset($customer['email']) || !filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
+            return ['error' => 'Invalid email'];
+        }
+
         if ($items == null || count($items) == 0) {
             return ['error' => 'No items'];
         }
