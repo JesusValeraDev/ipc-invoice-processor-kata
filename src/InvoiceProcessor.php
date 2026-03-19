@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App;
 
 use App\Domain\Model\Customer;
+use App\Domain\Model\Invoice;
 use App\Domain\Model\InvoiceTotals;
 use App\Domain\Model\LineItem;
 use InvalidArgumentException;
@@ -32,14 +33,14 @@ final class InvoiceProcessor
 
         $invoiceTotals = $this->calculate($items);
 
-        [$invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals] = $this->save($conn, $customer, $invoiceTotals, $items);
+        $invoice = $this->save($conn, $customer, $invoiceTotals, $items);
 
-        $output = $this->render($format, $invoiceNumber, $customer, $items, $invoiceTotals);
+        $output = $this->render($format, $invoice);
 
         return [
             'success' => true,
-            'invoice_number' => $invoiceNumber,
-            'invoice_id' => $invoiceId,
+            'invoice_number' => $invoice->invoiceNumber,
+            'invoice_id' => $invoice->invoiceId,
             'total' => $invoiceTotals->total,
             'output' => $output,
         ];
@@ -124,19 +125,18 @@ final class InvoiceProcessor
 
     /**
      * @param list<LineItem> $items
-     * @return array{int, string, array, list<LineItem>, float, float, float, float}
      */
     private function save(
         \mysqli $conn,
         Customer $customer,
         InvoiceTotals $invoiceTotals,
         array $items
-    ): array {
+    ): Invoice {
         $invoiceNumber = $this->generateInvoiceNumber();
         $invoiceId = $this->insertInvoice($conn, $invoiceNumber, $customer, $invoiceTotals);
         $this->saveLineItems($conn, $invoiceId, $items);
 
-        return [$invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals];
+        return new Invoice($invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals);
     }
 
     private function generateInvoiceNumber(): string
@@ -178,29 +178,20 @@ SQL;
         }
     }
 
-    /**
-     * @param list<LineItem> $items
-     */
-    private function render(
-        string $format,
-        string $invoiceNumber,
-        Customer $customer,
-        array $items,
-        InvoiceTotals $invoiceTotals,
-    ): string {
+    private function render(string $format, Invoice $invoice): string {
         if ($format == 'html') {
             $output = '<div class="invoice">';
-            $output .= '<h1>Invoice ' . $invoiceNumber . '</h1>';
+            $output .= '<h1>Invoice ' . $invoice->invoiceNumber . '</h1>';
             $output .= '<div class="customer">';
-            $output .= '<p>' . htmlspecialchars($customer->name) . '</p>';
-            $output .= '<p>' . htmlspecialchars($customer->email) . '</p>';
-            if (isset($customer->address)) {
-                $output .= '<p>' . nl2br(htmlspecialchars($customer->address->formatted())) . '</p>';
+            $output .= '<p>' . htmlspecialchars($invoice->customer->name) . '</p>';
+            $output .= '<p>' . htmlspecialchars($invoice->customer->email) . '</p>';
+            if (isset($invoice->customer->address)) {
+                $output .= '<p>' . nl2br(htmlspecialchars($invoice->customer->address->formatted())) . '</p>';
             }
             $output .= '</div>';
             $output .= '<table class="items">';
             $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
-            foreach ($items as $item) {
+            foreach ($invoice->items as $item) {
                 $output .= '<tr>';
                 $output .= '<td>' . htmlspecialchars($item->name) . '</td>';
                 $output .= '<td>' . $item->quantity . '</td>';
@@ -210,12 +201,12 @@ SQL;
             }
             $output .= '</table>';
             $output .= '<div class="totals">';
-            $output .= '<p>Subtotal: ' . number_format($invoiceTotals->subtotal, 2) . ' EUR</p>';
-            $output .= '<p>Tax (21%): ' . number_format($invoiceTotals->tax, 2) . ' EUR</p>';
-            if ($invoiceTotals->shipping > 0) {
-                $output .= '<p>Shipping: ' . number_format($invoiceTotals->shipping, 2) . ' EUR</p>';
+            $output .= '<p>Subtotal: ' . number_format($invoice->totals->subtotal, 2) . ' EUR</p>';
+            $output .= '<p>Tax (21%): ' . number_format($invoice->totals->tax, 2) . ' EUR</p>';
+            if ($invoice->totals->shipping > 0) {
+                $output .= '<p>Shipping: ' . number_format($invoice->totals->shipping, 2) . ' EUR</p>';
             }
-            $output .= '<p class="total"><strong>Total: ' . number_format($invoiceTotals->total, 2) . ' EUR</strong></p>';
+            $output .= '<p class="total"><strong>Total: ' . number_format($invoice->totals->total, 2) . ' EUR</strong></p>';
             $output .= '</div>';
             $output .= '</div>';
 
@@ -224,32 +215,32 @@ SQL;
 
         if ($format == 'json') {
             return (string) json_encode([
-                'invoice_number' => $invoiceNumber,
-                'customer' => $customer,
-                'items' => $items,
-                'subtotal' => $invoiceTotals->subtotal,
-                'tax' => $invoiceTotals->tax,
-                'shipping' => $invoiceTotals->shipping,
-                'total' => $invoiceTotals->total
+                'invoice_number' => $invoice->invoiceNumber,
+                'customer' => $invoice->customer,
+                'items' => $invoice->items,
+                'subtotal' => $invoice->totals->subtotal,
+                'tax' => $invoice->totals->tax,
+                'shipping' => $invoice->totals->shipping,
+                'total' => $invoice->totals->total
             ]);
         }
 
         if ($format == 'text') {
-            $output = "INVOICE: $invoiceNumber\n";
+            $output = "INVOICE: $invoice->invoiceNumber\n";
             $output .= "========================\n";
-            $output .= "Customer: " . $customer->name . "\n";
-            $output .= "Email: " . $customer->email . "\n\n";
+            $output .= "Customer: " . $invoice->customer->name . "\n";
+            $output .= "Email: " . $invoice->customer->email . "\n\n";
             $output .= "Items:\n";
-            foreach ($items as $item) {
+            foreach ($invoice->items as $item) {
                 $output .= "- " . $item->name . " x" . $item->quantity . " @ " . $item->unitPrice . " = " . $item->lineTotal() . " EUR\n";
             }
-            $output .= "\nSubtotal: $invoiceTotals->subtotal EUR\n";
-            $output .= "Tax: $invoiceTotals->tax EUR\n";
-            if ($invoiceTotals->shipping > 0) {
-                $output .= "Shipping: $invoiceTotals->shipping EUR\n";
+            $output .= "\nSubtotal: {$invoice->totals->subtotal} EUR\n";
+            $output .= "Tax: {$invoice->totals->tax} EUR\n";
+            if ($invoice->totals->shipping > 0) {
+                $output .= "Shipping: {$invoice->totals->shipping} EUR\n";
             }
             $output .= "========================\n";
-            $output .= "TOTAL: $invoiceTotals->total EUR\n";
+            $output .= "TOTAL: {$invoice->totals->total} EUR\n";
 
             return $output;
         }
