@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App;
 
 use App\Domain\Model\Customer;
+use App\Domain\Model\InvoiceTotals;
 use App\Domain\Model\LineItem;
 use InvalidArgumentException;
 
@@ -29,19 +30,17 @@ final class InvoiceProcessor
 
         $this->validate($customer, $items);
 
-        [$subtotal, $tax, $shipping, $total] = $this->calculate($items);
+        $invoiceTotals = $this->calculate($items);
 
-        [$invoiceId, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total] = $this->save(
-            $conn, $customer, $subtotal, $tax, $shipping, $total, $items
-        );
+        [$invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals] = $this->save($conn, $customer, $invoiceTotals, $items);
 
-        $output = $this->render($format, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total);
+        $output = $this->render($format, $invoiceNumber, $customer, $items, $invoiceTotals);
 
         return [
             'success' => true,
             'invoice_number' => $invoiceNumber,
             'invoice_id' => $invoiceId,
-            'total' => $total,
+            'total' => $invoiceTotals->total,
             'output' => $output,
         ];
     }
@@ -62,9 +61,8 @@ final class InvoiceProcessor
 
     /**
      * @param list<LineItem> $items
-     * @return array{float, float, float, float}
      */
-    private function calculate(array $items): array
+    private function calculate(array $items): InvoiceTotals
     {
         $subtotal = $this->calculateSubtotal($items);
         $itemCount = $this->totalQuantity($items);
@@ -73,12 +71,13 @@ final class InvoiceProcessor
 
         $total = $subtotal + $tax + $shipping;
 
-        return [
-            round($subtotal, 2),
-            round($tax, 2),
-            round($shipping, 2),
-            round($total, 2),
-        ];
+        return new InvoiceTotals(
+            subtotal: round($subtotal, 2),
+            tax: round($tax, 2),
+            shipping: round($shipping, 2),
+            total: round($total, 2),
+            itemCount: $itemCount,
+        );
     }
 
     /**
@@ -130,17 +129,14 @@ final class InvoiceProcessor
     private function save(
         \mysqli $conn,
         Customer $customer,
-        float $subtotal,
-        float $tax,
-        float $shipping,
-        float $total,
+        InvoiceTotals $invoiceTotals,
         array $items
     ): array {
         $invoiceNumber = $this->generateInvoiceNumber();
-        $invoiceId = $this->insertInvoice($conn, $invoiceNumber, $customer, $subtotal, $tax, $shipping, $total);
+        $invoiceId = $this->insertInvoice($conn, $invoiceNumber, $customer, $invoiceTotals);
         $this->saveLineItems($conn, $invoiceId, $items);
 
-        return [$invoiceId, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total];
+        return [$invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals];
     }
 
     private function generateInvoiceNumber(): string
@@ -152,14 +148,11 @@ final class InvoiceProcessor
         \mysqli $conn,
         string $invoiceNumber,
         Customer $customer,
-        float $subtotal,
-        float $tax,
-        float $shipping,
-        float $total
+        InvoiceTotals $invoiceTotals,
     ): int {
         $sql = <<<SQL
 INSERT INTO invoices (invoice_number, customer_id, subtotal, tax, shipping, total, created_at)
-VALUES ('$invoiceNumber', $customer->id, $subtotal, $tax, $shipping, $total, NOW())
+VALUES ('$invoiceNumber', $customer->id, {$invoiceTotals->subtotal}, {$invoiceTotals->tax}, {$invoiceTotals->shipping}, {$invoiceTotals->total}, NOW())
 SQL;
         mysqli_query($conn, $sql);
 
@@ -193,10 +186,7 @@ SQL;
         string $invoiceNumber,
         Customer $customer,
         array $items,
-        float $subtotal,
-        float $tax,
-        float $shipping,
-        float $total
+        InvoiceTotals $invoiceTotals,
     ): string {
         if ($format == 'html') {
             $output = '<div class="invoice">';
@@ -220,12 +210,12 @@ SQL;
             }
             $output .= '</table>';
             $output .= '<div class="totals">';
-            $output .= '<p>Subtotal: ' . number_format($subtotal, 2) . ' EUR</p>';
-            $output .= '<p>Tax (21%): ' . number_format($tax, 2) . ' EUR</p>';
-            if ($shipping > 0) {
-                $output .= '<p>Shipping: ' . number_format($shipping, 2) . ' EUR</p>';
+            $output .= '<p>Subtotal: ' . number_format($invoiceTotals->subtotal, 2) . ' EUR</p>';
+            $output .= '<p>Tax (21%): ' . number_format($invoiceTotals->tax, 2) . ' EUR</p>';
+            if ($invoiceTotals->shipping > 0) {
+                $output .= '<p>Shipping: ' . number_format($invoiceTotals->shipping, 2) . ' EUR</p>';
             }
-            $output .= '<p class="total"><strong>Total: ' . number_format($total, 2) . ' EUR</strong></p>';
+            $output .= '<p class="total"><strong>Total: ' . number_format($invoiceTotals->total, 2) . ' EUR</strong></p>';
             $output .= '</div>';
             $output .= '</div>';
 
@@ -237,10 +227,10 @@ SQL;
                 'invoice_number' => $invoiceNumber,
                 'customer' => $customer,
                 'items' => $items,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'shipping' => $shipping,
-                'total' => $total
+                'subtotal' => $invoiceTotals->subtotal,
+                'tax' => $invoiceTotals->tax,
+                'shipping' => $invoiceTotals->shipping,
+                'total' => $invoiceTotals->total
             ]);
         }
 
@@ -253,13 +243,14 @@ SQL;
             foreach ($items as $item) {
                 $output .= "- " . $item->name . " x" . $item->quantity . " @ " . $item->unitPrice . " = " . $item->lineTotal() . " EUR\n";
             }
-            $output .= "\nSubtotal: $subtotal EUR\n";
-            $output .= "Tax: $tax EUR\n";
-            if ($shipping > 0) {
-                $output .= "Shipping: $shipping EUR\n";
+            $output .= "\nSubtotal: $invoiceTotals->subtotal EUR\n";
+            $output .= "Tax: $invoiceTotals->tax EUR\n";
+            if ($invoiceTotals->shipping > 0) {
+                $output .= "Shipping: $invoiceTotals->shipping EUR\n";
             }
             $output .= "========================\n";
-            $output .= "TOTAL: $total EUR\n";
+            $output .= "TOTAL: $invoiceTotals->total EUR\n";
+
             return $output;
         }
 
