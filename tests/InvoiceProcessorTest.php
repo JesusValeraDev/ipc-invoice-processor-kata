@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Domain\Model\Address;
 use App\Domain\Model\LineItem;
 use App\InvoiceProcessor;
 use PHPUnit\Framework\TestCase;
@@ -46,11 +47,7 @@ final class InvoiceProcessorTest extends TestCase
                 'id' => 42,
                 'name' => 'Jane Smith',
                 'email' => 'jane.smith@example.com',
-                'address' => [
-                    'street' => 'Prinsengracht 123',
-                    'city' => 'Amsterdam',
-                    'zip' => '1015 DT',
-                ],
+                'address' => new Address(street: 'Prinsengracht 123', city:  'Amsterdam', zipCode:  '1015 DT'),
             ],
             'items' => [
                 new LineItem('Mechanical Keyboard', 1, 149.99),

@@ -13,11 +13,7 @@ $invoiceData = [
         'id' => 42,
         'name' => 'Jane Smith',
         'email' => 'jane.smith@example.com',
-        'address' => [
-            'street' => 'Prinsengracht 123',
-            'city' => 'Amsterdam',
-            'zip' => '1015 DT',
-        ],
+        'address' => new \App\Domain\Model\Address(street: 'Prinsengracht 123', city: 'Amsterdam', zipCode: '1015 DT'),
     ],
     'items' => [
         new \App\Domain\Model\LineItem('Mechanical Keyboard', 1, 149.99),

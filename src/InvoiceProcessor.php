@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Domain\Model\Address;
 use App\Domain\Model\LineItem;
 use InvalidArgumentException;
 
@@ -197,7 +198,7 @@ SQL;
     }
 
     /**
-     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
+     * @param array{id: int, name: string, email: string, address: Address} $customer
      * @param list<LineItem> $items
      */
     private function render(
@@ -217,9 +218,7 @@ SQL;
             $output .= '<p>' . htmlspecialchars($customer['name']) . '</p>';
             $output .= '<p>' . htmlspecialchars($customer['email']) . '</p>';
             if (isset($customer['address'])) {
-                $output .= '<p>' . htmlspecialchars($customer['address']['street']) . '</p>';
-                $output .= '<p>' . htmlspecialchars($customer['address']['city'])
-                    . ', ' . htmlspecialchars($customer['address']['zip']) . '</p>';
+                $output .= '<p>' . nl2br(htmlspecialchars($customer['address']->formatted())) . '</p>';
             }
             $output .= '</div>';
             $output .= '<table class="items">';
