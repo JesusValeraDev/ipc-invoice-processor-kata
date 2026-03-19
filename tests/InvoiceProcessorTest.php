@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Domain\Model\LineItem;
 use App\InvoiceProcessor;
 use PHPUnit\Framework\TestCase;
 use mysqli;
@@ -52,9 +53,9 @@ final class InvoiceProcessorTest extends TestCase
                 ],
             ],
             'items' => [
-                ['name' => 'Mechanical Keyboard', 'qty' => 1, 'price' => 149.99],
-                ['name' => 'USB-C Cable', 'qty' => 3, 'price' => 12.50],
-                ['name' => 'Mouse Pad XL', 'qty' => 1, 'price' => 24.95],
+                new LineItem('Mechanical Keyboard', 1, 149.99),
+                new LineItem('USB-C Cable', 3, 12.50),
+                new LineItem('Mouse Pad XL', 1, 24.95),
             ],
         ];
 
@@ -134,7 +135,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 1, 'price' => 3.00],
+            new LineItem('Sticker', 1, 3.00),
         ];
         // subtotal = 3.00, no discount, after_discount = 3.00
         // tax = 3.00 * 0.21 = 0.63
@@ -151,8 +152,8 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker A', 'qty' => 3, 'price' => 2.00],
-            ['name' => 'Sticker B', 'qty' => 1, 'price' => 1.00],
+            new LineItem('Sticker A', 3, 2.00),
+            new LineItem('Sticker B', 1, 1.00),
         ];
         // subtotal = 6.00 + 1.00 = 7.00
         // item_count = 4 (3-5), shipping = 6.95
@@ -169,7 +170,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 7, 'price' => 1.00],
+            new LineItem('Sticker', 7, 1.00),
         ];
         // subtotal = 7.00, item_count = 7 (>5), shipping = 9.95
         // tax = 7.00 * 0.21 = 1.47
@@ -287,7 +288,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Widget', 'qty' => 1, 'price' => 50.00],
+            new LineItem('Widget', 1, 50.00),
         ];
         // after_discount = 50.00, which is NOT < 50, so shipping = 0
 
@@ -313,7 +314,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 1, 'price' => 3.00],
+            new LineItem('Sticker', 1, 3.00),
         ];
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
@@ -328,7 +329,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 1, 'price' => 3.00],
+            new LineItem('Sticker', 1, 3.00),
         ];
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'text');
@@ -355,7 +356,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Widget', 'qty' => 2, 'price' => 15.00],
+            new LineItem('Widget', 2, 15.00),
         ];
 
         $result = $this->processAndDecode($data);
@@ -375,7 +376,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 2, 'price' => 1.00],
+            new LineItem('Sticker', 2, 1.00),
         ];
         // subtotal = 2.00, item_count = 2 (<=2), shipping = 4.95
 
@@ -388,7 +389,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
         $data['items'] = [
-            ['name' => 'Sticker', 'qty' => 5, 'price' => 1.00],
+            new LineItem('Sticker', 5, 1.00),
         ];
         // subtotal = 5.00, item_count = 5 (<=5), shipping = 6.95
 

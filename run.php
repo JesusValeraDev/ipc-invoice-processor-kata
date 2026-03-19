@@ -20,9 +20,9 @@ $invoiceData = [
         ],
     ],
     'items' => [
-        ['name' => 'Mechanical Keyboard', 'qty' => 1, 'price' => 149.99],
-        ['name' => 'USB-C Cable', 'qty' => 3, 'price' => 12.50],
-        ['name' => 'Mouse Pad XL', 'qty' => 1, 'price' => 24.95],
+        new \App\Domain\Model\LineItem('Mechanical Keyboard', 1, 149.99),
+        new \App\Domain\Model\LineItem('USB-C Cable', 3, 12.50),
+        new \App\Domain\Model\LineItem('Mouse Pad XL', 1, 24.95),
     ],
 ];
 
@@ -33,9 +33,10 @@ echo "Customer: {$invoiceData['customer']['name']}\n";
 echo "Email: {$invoiceData['customer']['email']}\n\n";
 
 echo "Items:\n";
+/** @var \App\Domain\Model\LineItem $item */
 foreach ($invoiceData['items'] as $item) {
-    $lineTotal = $item['qty'] * $item['price'];
-    printf("  - %s x%d @ %.2f = %.2f EUR\n", $item['name'], $item['qty'], $item['price'], $lineTotal);
+    $lineTotal = $item->quantity * $item->unitPrice;
+    printf("  - %s x%d @ %.2f = %.2f EUR\n", $item->name, $item->quantity, $item->unitPrice, $lineTotal);
 }
 echo "\n";
 

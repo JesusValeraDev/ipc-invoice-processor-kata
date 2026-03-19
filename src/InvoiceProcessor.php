@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Domain\Model\LineItem;
 use InvalidArgumentException;
 
 final class InvoiceProcessor
@@ -19,7 +20,7 @@ final class InvoiceProcessor
     /**
      * @param array{
      *   customer: array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}},
-     *   items: list<array{name: string, qty: int, price: float}>
+     *   items: list<LineItem>
      * } $invoiceData
      * @return array{success: true, invoice_number: string, invoice_id: int, total: float, output: string}
      */
@@ -49,7 +50,7 @@ final class InvoiceProcessor
 
     /**
      * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      */
     private function validate(array $customer, array $items): void
     {
@@ -67,7 +68,7 @@ final class InvoiceProcessor
     }
 
     /**
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      * @return array{float, float, float, float}
      */
     private function calculate(array $items): array
@@ -88,25 +89,25 @@ final class InvoiceProcessor
     }
 
     /**
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      */
     public function calculateSubtotal(array $items): float
     {
         return array_reduce(
             array: $items,
-            callback: fn(float $sum, array $item) => $sum + ($item['qty'] * $item['price']),
+            callback: fn(float $sum, LineItem $item) => $sum + $item->lineTotal(),
             initial: 0.0,
         );
     }
 
     /**
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      */
     public function totalQuantity(array $items): int
     {
         return array_reduce(
             array: $items,
-            callback: fn(int $count, array $item) => $count + $item['qty'],
+            callback: fn(int $count, LineItem $item) => $count + $item->quantity,
             initial: 0,
         );
     }
@@ -131,8 +132,8 @@ final class InvoiceProcessor
 
     /**
      * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
-     * @param list<array{name: string, qty: int, price: float}> $items
-     * @return array{int, string, array, array, float, float, float, float}
+     * @param list<LineItem> $items
+     * @return array{int, string, array, list<LineItem>, float, float, float, float}
      */
     private function save(
         \mysqli $conn,
@@ -177,19 +178,18 @@ SQL;
     }
 
     /**
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      */
     private function saveLineItems(\mysqli $conn, int $invoiceId, array $items): void
     {
         foreach ($items as $item) {
-            $name = mysqli_real_escape_string($conn, $item['name']);
-            $quantity = $item['qty'];
-            $price = $item['price'];
-            $lineTotal = $quantity * $price;
+            $name = mysqli_real_escape_string($conn, $item->name);
+            $quantity = $item->quantity;
+            $price = $item->unitPrice;
 
             $sql = <<<SQL
 INSERT INTO invoice_items (invoice_id, product_name, quantity, unit_price, line_total)
-VALUES ($invoiceId, '$name', $quantity, $price, $lineTotal)
+VALUES ($invoiceId, '$name', $quantity, $price, {$item->lineTotal()})
 SQL;
 
             mysqli_query($conn, $sql);
@@ -198,7 +198,7 @@ SQL;
 
     /**
      * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
-     * @param list<array{name: string, qty: int, price: float}> $items
+     * @param list<LineItem> $items
      */
     private function render(
         string $format,
@@ -226,10 +226,10 @@ SQL;
             $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
             foreach ($items as $item) {
                 $output .= '<tr>';
-                $output .= '<td>' . htmlspecialchars($item['name']) . '</td>';
-                $output .= '<td>' . $item['qty'] . '</td>';
-                $output .= '<td>' . number_format($item['price'], 2) . ' EUR</td>';
-                $output .= '<td>' . number_format($item['qty'] * $item['price'], 2) . ' EUR</td>';
+                $output .= '<td>' . htmlspecialchars($item->name) . '</td>';
+                $output .= '<td>' . $item->quantity . '</td>';
+                $output .= '<td>' . number_format($item->unitPrice, 2) . ' EUR</td>';
+                $output .= '<td>' . number_format($item->lineTotal(), 2) . ' EUR</td>';
                 $output .= '</tr>';
             }
             $output .= '</table>';
@@ -265,7 +265,7 @@ SQL;
             $output .= "Email: " . $customer['email'] . "\n\n";
             $output .= "Items:\n";
             foreach ($items as $item) {
-                $output .= "- " . $item['name'] . " x" . $item['qty'] . " @ " . $item['price'] . " = " . ($item['qty'] * $item['price']) . " EUR\n";
+                $output .= "- " . $item->name . " x" . $item->quantity . " @ " . $item->unitPrice . " = " . $item->lineTotal() . " EUR\n";
             }
             $output .= "\nSubtotal: $subtotal EUR\n";
             $output .= "Tax: $tax EUR\n";
