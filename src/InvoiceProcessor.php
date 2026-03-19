@@ -32,32 +32,9 @@ final class InvoiceProcessor
 
         [$subtotal, $tax, $shipping, $total] = $this->calculate($items);
 
-        // Round to 2 decimals
-        $total = round($total, 2);
-        $tax = round($tax, 2);
-        $subtotal = round($subtotal, 2);
-        $shipping = round($shipping, 2);
-
-        // Generate invoice number
-        $invoiceNumber = 'INV-' . date('Ymd') . '-' . rand(1000, 9999);
-
-        $customerId = $customer['id'];
-
-        // Save to database
-        $insertInvoiceSql = "INSERT INTO invoices (invoice_number, customer_id, subtotal, tax, shipping, total, created_at)
-            VALUES ('$invoiceNumber', $customerId, $subtotal, $tax, $shipping, $total, NOW())";
-        mysqli_query($conn, $insertInvoiceSql);
-        $invoiceId = mysqli_insert_id($conn);
-
-        // Save line items
-        foreach ($items as $item) {
-            $name = mysqli_real_escape_string($conn, $item['name']);
-            $qty = $item['qty'];
-            $price = $item['price'];
-            $insertItemSql = "INSERT INTO invoice_items (invoice_id, product_name, quantity, unit_price, line_total)
-                 VALUES ($invoiceId, '" . $name . "', " . $qty . ", " . $price . ", " . ($qty * $price) . ")";
-            mysqli_query($conn, $insertItemSql);
-        }
+        [$invoiceId, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total] = $this->save(
+            $conn, $customer, $subtotal, $tax, $shipping, $total, $items
+        );
 
         // Generate output
         if ($format == 'html') {
@@ -163,7 +140,12 @@ final class InvoiceProcessor
 
         $total = $subtotal + $tax + $shipping;
 
-        return [$subtotal, $tax, $shipping, $total];
+        return [
+            round($subtotal, 2),
+            round($tax, 2),
+            round($shipping, 2),
+            round($total, 2),
+        ];
     }
 
     /**
@@ -206,5 +188,72 @@ final class InvoiceProcessor
             $itemCount <= 5 => self::SHIPPING_MEDIUM,
             default => self::SHIPPING_LARGE,
         };
+    }
+
+    /**
+     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
+     * @param list<array{name: string, qty: int, price: float}> $items
+     * @return array{int, string, array, array, float, float, float, float}
+     */
+    private function save(
+        \mysqli $conn,
+        array $customer,
+        float $subtotal,
+        float $tax,
+        float $shipping,
+        float $total,
+        array $items
+    ): array {
+        $invoiceNumber = $this->generateInvoiceNumber();
+        $invoiceId = $this->insertInvoice($conn, $invoiceNumber, $customer, $subtotal, $tax, $shipping, $total);
+        $this->saveLineItems($conn, $invoiceId, $items);
+
+        return [$invoiceId, $invoiceNumber, $customer, $items, $subtotal, $tax, $shipping, $total];
+    }
+
+    private function generateInvoiceNumber(): string
+    {
+        return 'INV-' . date('Ymd') . '-' . rand(1000, 9999);
+    }
+
+    /**
+     * @param array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}} $customer
+     */
+    private function insertInvoice(
+        \mysqli $conn,
+        string $invoiceNumber,
+        array $customer,
+        float $subtotal,
+        float $tax,
+        float $shipping,
+        float $total
+    ): int {
+        $sql = <<<SQL
+INSERT INTO invoices (invoice_number, customer_id, subtotal, tax, shipping, total, created_at)
+VALUES ('$invoiceNumber', {$customer['id']}, $subtotal, $tax, $shipping, $total, NOW())
+SQL;
+        mysqli_query($conn, $sql);
+
+        return mysqli_insert_id($conn);
+    }
+
+    /**
+     * @param list<array{name: string, qty: int, price: float}> $items
+     */
+    private function saveLineItems(\mysqli $conn, int $invoiceId, array $items): void
+    {
+        foreach ($items as $item) {
+            $name = mysqli_real_escape_string($conn, $item['name']);
+            $quantity = $item['qty'];
+            $price = $item['price'];
+            $lineTotal = $quantity * $price;
+
+            $sql = <<<SQL
+INSERT INTO invoice_items (invoice_id, product_name, quantity, unit_price, line_total)
+VALUES ($invoiceId, '$name', $quantity, $price, $lineTotal)
+SQL;
+
+            mysqli_query($conn, $sql);
+        }
     }
 }
