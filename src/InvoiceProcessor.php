@@ -4,29 +4,10 @@ declare(strict_types=1);
 
 namespace App;
 
-// Invoice Processor - Last modified by Dave (2019) - DON'T TOUCH!
-// TODO: cleanup someday
-// Fixed bug with tax calc - John 2020
 final class InvoiceProcessor
 {
-    // Helper that was going to be used but never finished
-    // public function format_currency($amount) {
-    //     return number_format($amount, 2) . ' EUR';
-    // }
-
-    // Old tax calculation - keeping just in case
-    public function calc_tax_old($amount)
-    {
-        return $amount * 0.19; // old rate
-    }
-
     public function processInvoice($invoiceData, $conn, $format = 'html')
     {
-        // Old validation - not used anymore
-        // if ($inv_data['type'] == 'old_format') {
-        //     return convert_old_format($inv_data);
-        // }
-
         $c = $invoiceData['customer'];
         $i = $invoiceData['items'];
 
