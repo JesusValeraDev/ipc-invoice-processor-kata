@@ -8,13 +8,13 @@ final class InvoiceProcessor
 {
     public function processInvoice($invoiceData, $conn, $format = 'html')
     {
-        $c = $invoiceData['customer'];
-        $i = $invoiceData['items'];
+        $customer = $invoiceData['customer'];
+        $items = $invoiceData['items'];
 
         // Validate
-        if ($c != null) {
-            if (isset($c['email'])) {
-                if (!filter_var($c['email'], FILTER_VALIDATE_EMAIL)) {
+        if ($customer != null) {
+            if (isset($customer['email'])) {
+                if (!filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
                     return ['error' => 'Invalid email'];
                 }
             } else {
@@ -25,14 +25,14 @@ final class InvoiceProcessor
         }
 
         // Check items
-        if ($i == null || count($i) == 0) {
+        if ($items == null || count($items) == 0) {
             return ['error' => 'No items'];
         }
 
         // Calculate subtotal
         $subtotal = 0;
         $itemCount = 0;
-        foreach ($i as $item) {
+        foreach ($items as $item) {
             $lineTotal = $item['qty'] * $item['price'];
             $subtotal += $lineTotal;
             $itemCount += $item['qty'];
@@ -52,7 +52,7 @@ final class InvoiceProcessor
             };
         }
 
-        $customerId = $c['id'];
+        $customerId = $customer['id'];
         $total = $subtotal + $tax + $shipping;
 
         // Round to 2 decimals
@@ -71,7 +71,7 @@ final class InvoiceProcessor
         $invoiceId = mysqli_insert_id($conn);
 
         // Save line items
-        foreach ($i as $item) {
+        foreach ($items as $item) {
             $name = mysqli_real_escape_string($conn, $item['name']);
             $qty = $item['qty'];
             $price = $item['price'];
@@ -85,17 +85,17 @@ final class InvoiceProcessor
             $output = '<div class="invoice">';
             $output .= '<h1>Invoice ' . $invoiceNumber . '</h1>';
             $output .= '<div class="customer">';
-            $output .= '<p>' . htmlspecialchars($c['name']) . '</p>';
-            $output .= '<p>' . htmlspecialchars($c['email']) . '</p>';
-            if (isset($c['address'])) {
-                $output .= '<p>' . htmlspecialchars($c['address']['street']) . '</p>';
-                $output .= '<p>' . htmlspecialchars($c['address']['city'])
-                    . ', ' . htmlspecialchars($c['address']['zip']) . '</p>';
+            $output .= '<p>' . htmlspecialchars($customer['name']) . '</p>';
+            $output .= '<p>' . htmlspecialchars($customer['email']) . '</p>';
+            if (isset($customer['address'])) {
+                $output .= '<p>' . htmlspecialchars($customer['address']['street']) . '</p>';
+                $output .= '<p>' . htmlspecialchars($customer['address']['city'])
+                    . ', ' . htmlspecialchars($customer['address']['zip']) . '</p>';
             }
             $output .= '</div>';
             $output .= '<table class="items">';
             $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
-            foreach ($i as $item) {
+            foreach ($items as $item) {
                 $output .= '<tr>';
                 $output .= '<td>' . htmlspecialchars($item['name']) . '</td>';
                 $output .= '<td>' . $item['qty'] . '</td>';
@@ -116,8 +116,8 @@ final class InvoiceProcessor
         } elseif ($format == 'json') {
             $output = json_encode([
                 'invoice_number' => $invoiceNumber,
-                'customer' => $c,
-                'items' => $i,
+                'customer' => $customer,
+                'items' => $items,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'shipping' => $shipping,
@@ -126,10 +126,10 @@ final class InvoiceProcessor
         } elseif ($format == 'text') {
             $output = "INVOICE: $invoiceNumber\n";
             $output .= "========================\n";
-            $output .= "Customer: " . $c['name'] . "\n";
-            $output .= "Email: " . $c['email'] . "\n\n";
+            $output .= "Customer: " . $customer['name'] . "\n";
+            $output .= "Email: " . $customer['email'] . "\n\n";
             $output .= "Items:\n";
-            foreach ($i as $item) {
+            foreach ($items as $item) {
                 $output .= "- " . $item['name'] . " x" . $item['qty'] . " @ " . $item['price'] . " = " . ($item['qty'] * $item['price']) . " EUR\n";
             }
             $output .= "\nSubtotal: $subtotal EUR\n";
