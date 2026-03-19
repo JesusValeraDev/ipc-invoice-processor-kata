@@ -14,7 +14,14 @@ final class InvoiceProcessor
     const float SHIPPING_MEDIUM = 6.95;
     const float SHIPPING_LARGE = 9.95;
 
-    public function processInvoice($invoiceData, $conn, $format = 'html')
+    /**
+     * @param array{
+     *   customer: array{id: int, name: string, email: string, address: array{street: string, city: string, zip: string}},
+     *   items: list<array{name: string, qty: int, price: float}>
+     * } $invoiceData
+     * @return array{success: true, invoice_number: string, invoice_id: int, total: float, output: string}
+     */
+    public function processInvoice(array $invoiceData, \mysqli $conn, string $format = 'html'): array
     {
         $customer = $invoiceData['customer'];
         $items = $invoiceData['items'];
