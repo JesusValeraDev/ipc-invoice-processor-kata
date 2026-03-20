@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Application\DTO\InvoiceRequest;
+use App\Application\InvoiceProcessor;
 use App\Domain\Model\Address;
 use App\Domain\Model\Customer;
 use App\Domain\Model\LineItem;
-use App\InvoiceProcessor;
-use PHPUnit\Framework\TestCase;
 use mysqli;
+use PHPUnit\Framework\TestCase;
 
 final class InvoiceProcessorTest extends TestCase
 {
@@ -41,26 +42,24 @@ final class InvoiceProcessorTest extends TestCase
         mysqli_query(self::$conn, "DELETE FROM invoices");
     }
 
-    private function baseInvoiceData(array $overrides = []): array
+    private function baseInvoiceData(): InvoiceRequest
     {
-        $data = [
-            'customer' => new Customer(
+        return new InvoiceRequest(
+            customer: new Customer(
                 id: 42,
                 name: 'Jane Smith',
                 email: 'jane.smith@example.com',
                 address: new Address(street: 'Prinsengracht 123', city:  'Amsterdam', zipCode:  '1015 DT'),
             ),
-            'items' => [
+            items: [
                 new LineItem('Mechanical Keyboard', 1, 149.99),
                 new LineItem('USB-C Cable', 3, 12.50),
                 new LineItem('Mouse Pad XL', 1, 24.95),
             ],
-        ];
-
-        return array_replace_recursive($data, $overrides);
+        );
     }
 
-    private function processAndDecode(array $invoiceData): array
+    private function processAndDecode(InvoiceRequest $invoiceData): array
     {
         $result = $this->invoiceProcessor->processInvoice($invoiceData, self::$conn, 'json');
         $result['decoded'] = json_decode($result['output'], true);
@@ -73,7 +72,8 @@ final class InvoiceProcessorTest extends TestCase
     {
         $this->expectExceptionMessage('Invalid email');
 
-        $data = $this->baseInvoiceData(['customer' => new Customer(id: 42, name: 'John', email: 'not-an-email')]);
+        $data = $this->baseInvoiceData();
+        $data->customer = new Customer(id: 42, name: 'John', email: 'not-an-email');
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -83,7 +83,7 @@ final class InvoiceProcessorTest extends TestCase
         $this->expectExceptionMessage('No items');
 
         $data = $this->baseInvoiceData();
-        $data['items'] = [];
+        $data->items = [];
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -93,7 +93,7 @@ final class InvoiceProcessorTest extends TestCase
         $this->expectExceptionMessage('Invalid email');
 
         $data = $this->baseInvoiceData();
-        unset($data['customer']->email);
+        unset($data->customer->email);
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -132,7 +132,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_495_when_under_50_and_2_or_fewer_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 1, 3.00),
         ];
         // subtotal = 3.00, no discount, after_discount = 3.00
@@ -149,7 +149,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_695_when_under_50_and_3_to_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker A', 3, 2.00),
             new LineItem('Sticker B', 1, 1.00),
         ];
@@ -167,7 +167,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_995_when_under_50_and_more_than_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 7, 1.00),
         ];
         // subtotal = 7.00, item_count = 7 (>5), shipping = 9.95
@@ -285,7 +285,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_free_shipping_when_exactly_50(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Widget', 1, 50.00),
         ];
         // after_discount = 50.00, which is NOT < 50, so shipping = 0
@@ -300,7 +300,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_html_output_without_address(): void
     {
         $data = $this->baseInvoiceData();
-        unset($data['customer']->address);
+        unset($data->customer->address);
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
 
@@ -311,7 +311,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_html_output_shows_shipping_line(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 1, 3.00),
         ];
 
@@ -326,7 +326,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_text_output_shows_shipping_line(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 1, 3.00),
         ];
 
@@ -353,7 +353,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_line_item_values_persisted_correctly(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Widget', 2, 15.00),
         ];
 
@@ -373,7 +373,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_495_when_exactly_2_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 2, 1.00),
         ];
         // subtotal = 2.00, item_count = 2 (<=2), shipping = 4.95
@@ -386,7 +386,7 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_695_when_exactly_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data['items'] = [
+        $data->items = [
             new LineItem('Sticker', 5, 1.00),
         ];
         // subtotal = 5.00, item_count = 5 (<=5), shipping = 6.95

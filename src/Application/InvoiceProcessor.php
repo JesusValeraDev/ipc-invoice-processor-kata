@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App;
+namespace App\Application;
 
+use App\Application\DTO\InvoiceRequest;
 use App\Domain\Model\Customer;
 use App\Domain\Model\Invoice;
 use App\Domain\Model\InvoiceTotals;
@@ -21,13 +22,12 @@ final class InvoiceProcessor
     const float SHIPPING_LARGE = 9.95;
 
     /**
-     * @param array{customer: Customer, items: list<LineItem>} $invoiceData
      * @return array{success: true, invoice_number: string, invoice_id: int, total: float, output: string}
      */
-    public function processInvoice(array $invoiceData, \mysqli $conn, string $format = 'html'): array
+    public function processInvoice(InvoiceRequest $invoiceData, \mysqli $conn, string $format = 'html'): array
     {
-        $customer = $invoiceData['customer'];
-        $items = $invoiceData['items'];
+        $customer = $invoiceData->customer;
+        $items = $invoiceData->items;
 
         $this->validate($customer, $items);
 
