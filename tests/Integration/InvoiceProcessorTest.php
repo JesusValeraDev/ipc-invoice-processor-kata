@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests;
+namespace Tests\Integration;
 
 use App\Application\DTO\InvoiceRequest;
 use App\Application\InvoiceProcessor;
