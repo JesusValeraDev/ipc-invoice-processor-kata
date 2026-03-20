@@ -273,12 +273,10 @@ final class InvoiceProcessorTest extends TestCase
 
     public function test_unknown_format_returns_empty_output(): void
     {
+        $this->expectExceptionMessage('Invalid format');
         $data = $this->baseInvoiceData();
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'xml');
-
-        $this->assertTrue($result['success']);
-        $this->assertSame('', $result['output']);
+        $this->invoiceProcessor->processInvoice($data, self::$conn, 'xml');
     }
 
     // ---- Free shipping  ----

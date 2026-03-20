@@ -7,8 +7,8 @@ namespace App\Application;
 use App\Application\DTO\InvoiceRequest;
 use App\Domain\Model\Customer;
 use App\Domain\Model\Invoice;
-use App\Domain\Model\LineItem;
 use App\Domain\Model\LineItemCollection;
+use App\Domain\Port\InvoiceRendererStrategy;
 use App\Domain\Service\InvoiceTotalsCalculator;
 use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
 use App\Infrastructure\Renderer\InvoiceJsonRenderer;
@@ -54,11 +54,15 @@ final class InvoiceProcessor
     }
 
     private function render(string $format, Invoice $invoice): string {
-        return match ($format) {
-            'html' => new InvoiceHtmlRenderer()->render($invoice),
-            'json' => new InvoiceJsonRenderer()->render($invoice),
-            'text' => new InvoiceTextRenderer()->render($invoice),
-            default => '',
+
+        /** @var InvoiceRendererStrategy $render */
+        $render = match ($format) {
+            'html' => new InvoiceHtmlRenderer(),
+            'json' => new InvoiceJsonRenderer(),
+            'text' => new InvoiceTextRenderer(),
+            default => throw new InvalidArgumentException('Invalid format'),
         };
+
+        return $render->render($invoice);
     }
 }

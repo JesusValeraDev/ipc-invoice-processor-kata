@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Infrastructure\Renderer;
 
 use App\Domain\Model\Invoice;
+use App\Domain\Port\InvoiceRendererStrategy;
 
-final class InvoiceHtmlRenderer
+final class InvoiceHtmlRenderer implements InvoiceRendererStrategy
 {
     public function render(Invoice $invoice): string
     {
