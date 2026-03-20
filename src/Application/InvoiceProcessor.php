@@ -11,6 +11,7 @@ use App\Domain\Model\LineItem;
 use App\Domain\Service\InvoiceTotalsCalculator;
 use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
 use App\Infrastructure\Renderer\InvoiceJsonRenderer;
+use App\Infrastructure\Renderer\InvoiceTextRenderer;
 use App\Infrastructure\Repository\MysqliInvoiceRepository;
 use InvalidArgumentException;
 
@@ -55,34 +56,11 @@ final class InvoiceProcessor
     }
 
     private function render(string $format, Invoice $invoice): string {
-        if ($format == 'html') {
-            return new InvoiceHtmlRenderer()->render($invoice);
-        }
-
-        if ($format == 'json') {
-            return new InvoiceJsonRenderer()->render($invoice);
-        }
-
-        if ($format == 'text') {
-            $output = "INVOICE: $invoice->invoiceNumber\n";
-            $output .= "========================\n";
-            $output .= "Customer: " . $invoice->customer->name . "\n";
-            $output .= "Email: " . $invoice->customer->email . "\n\n";
-            $output .= "Items:\n";
-            foreach ($invoice->items as $item) {
-                $output .= "- " . $item->name . " x" . $item->quantity . " @ " . $item->unitPrice . " = " . $item->lineTotal() . " EUR\n";
-            }
-            $output .= "\nSubtotal: {$invoice->totals->subtotal} EUR\n";
-            $output .= "Tax: {$invoice->totals->tax} EUR\n";
-            if ($invoice->totals->shipping > 0) {
-                $output .= "Shipping: {$invoice->totals->shipping} EUR\n";
-            }
-            $output .= "========================\n";
-            $output .= "TOTAL: {$invoice->totals->total} EUR\n";
-
-            return $output;
-        }
-
-        return '';
+        return match ($format) {
+            'html' => new InvoiceHtmlRenderer()->render($invoice),
+            'json' => new InvoiceJsonRenderer()->render($invoice),
+            'text' => new InvoiceTextRenderer()->render($invoice),
+            default => '',
+        };
     }
 }
