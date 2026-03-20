@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-final class DateBasedInvoiceNumberGenerator
+use App\Domain\Port\InvoiceNumberGenerator;
+
+final class DateBasedInvoiceNumberGenerator implements InvoiceNumberGenerator
 {
     public function generate(): string
     {

@@ -34,8 +34,15 @@ foreach ($invoiceData->items as $item) {
 }
 echo "\n";
 
-$invoiceProcessor = new \App\Application\InvoiceProcessor();
-$result = $invoiceProcessor->processInvoice($invoiceData, $conn, 'json');
+$invoiceProcessor = new \App\Application\InvoiceProcessor(
+    new \App\Domain\Service\InvoiceTotalsCalculator(),
+    new \App\Infrastructure\Repository\MysqliInvoiceRepository(
+        connection: $conn,
+    invoiceNumberGenerator: new \App\Infrastructure\Repository\DateBasedInvoiceNumberGenerator(),
+    ),
+    new \App\Infrastructure\Renderer\InvoiceJsonRenderer(),
+);
+$result = $invoiceProcessor->processInvoice($invoiceData);
 $details = json_decode($result['output'], true);
 
 echo "Totals:\n";

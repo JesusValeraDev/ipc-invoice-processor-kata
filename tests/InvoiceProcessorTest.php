@@ -10,13 +10,18 @@ use App\Domain\Model\Address;
 use App\Domain\Model\Customer;
 use App\Domain\Model\LineItem;
 use App\Domain\Model\LineItemCollection;
+use App\Domain\Port\InvoiceRendererStrategy;
+use App\Domain\Service\InvoiceTotalsCalculator;
+use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
+use App\Infrastructure\Renderer\InvoiceJsonRenderer;
+use App\Infrastructure\Renderer\InvoiceTextRenderer;
+use App\Infrastructure\Repository\DateBasedInvoiceNumberGenerator;
+use App\Infrastructure\Repository\MysqliInvoiceRepository;
 use mysqli;
 use PHPUnit\Framework\TestCase;
 
 final class InvoiceProcessorTest extends TestCase
 {
-    private InvoiceProcessor $invoiceProcessor;
-
     private static ?mysqli $conn = null;
 
     public static function setUpBeforeClass(): void
@@ -37,8 +42,6 @@ final class InvoiceProcessorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->invoiceProcessor = new InvoiceProcessor();
-
         mysqli_query(self::$conn, "DELETE FROM invoice_items");
         mysqli_query(self::$conn, "DELETE FROM invoices");
     }
@@ -60,9 +63,15 @@ final class InvoiceProcessorTest extends TestCase
         );
     }
 
-    private function processAndDecode(InvoiceRequest $invoiceData): array
+    private function processAndDecode(InvoiceRequest $invoiceData, InvoiceRendererStrategy $invoiceRenderer = new InvoiceJsonRenderer()): array
     {
-        $result = $this->invoiceProcessor->processInvoice($invoiceData, self::$conn, 'json');
+        $invoiceProcessor = new InvoiceProcessor(
+            new InvoiceTotalsCalculator(),
+            new MysqliInvoiceRepository(self::$conn, new DateBasedInvoiceNumberGenerator()),
+            $invoiceRenderer,
+        );
+
+        $result = $invoiceProcessor->processInvoice($invoiceData);
         $result['decoded'] = json_decode($result['output'], true);
         return $result;
     }
@@ -76,7 +85,7 @@ final class InvoiceProcessorTest extends TestCase
         $data = $this->baseInvoiceData();
         $data->customer = new Customer(id: 42, name: 'John', email: 'not-an-email');
 
-        $this->invoiceProcessor->processInvoice($data, self::$conn);
+        $this->processAndDecode($data);
     }
 
     public function test_returns_error_when_no_items(): void
@@ -86,7 +95,7 @@ final class InvoiceProcessorTest extends TestCase
         $data = $this->baseInvoiceData();
         $data->items = new LineItemCollection([]);
 
-        $this->invoiceProcessor->processInvoice($data, self::$conn);
+        $this->processAndDecode($data);
     }
 
     public function test_returns_error_when_email_missing(): void
@@ -96,7 +105,7 @@ final class InvoiceProcessorTest extends TestCase
         $data = $this->baseInvoiceData();
         unset($data->customer->email);
 
-        $this->invoiceProcessor->processInvoice($data, self::$conn);
+        $this->processAndDecode($data);
     }
 
     // ---- Basic invoice ----
@@ -225,7 +234,7 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
+        $result = $this->processAndDecode($data, new InvoiceHtmlRenderer());
 
         $this->assertStringContainsString('<div class="invoice">', $result['output']);
         $this->assertStringContainsString('Jane Smith', $result['output']);
@@ -237,20 +246,19 @@ final class InvoiceProcessorTest extends TestCase
     {
         $data = $this->baseInvoiceData();
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'json');
-        $decoded = json_decode($result['output'], true);
+        $result = $this->processAndDecode($data);
 
-        $this->assertNotNull($decoded);
-        $this->assertArrayHasKey('invoice_number', $decoded);
-        $this->assertArrayHasKey('subtotal', $decoded);
-        $this->assertArrayHasKey('total', $decoded);
+        $this->assertNotNull($result['decoded']);
+        $this->assertArrayHasKey('invoice_number', $result['decoded']);
+        $this->assertArrayHasKey('subtotal', $result['decoded']);
+        $this->assertArrayHasKey('total', $result['decoded']);
     }
 
     public function test_text_output_contains_invoice_details(): void
     {
         $data = $this->baseInvoiceData();
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'text');
+        $result = $this->processAndDecode($data, new InvoiceTextRenderer());
 
         $this->assertStringContainsString('INVOICE:', $result['output']);
         $this->assertStringContainsString('Jane Smith', $result['output']);
@@ -267,16 +275,6 @@ final class InvoiceProcessorTest extends TestCase
         $result = $this->processAndDecode($data);
 
         $this->assertMatchesRegularExpression('/^INV-\d{8}-\d{4}$/', $result['invoice_number']);
-    }
-
-    // ---- Unknown output format ----
-
-    public function test_unknown_format_returns_empty_output(): void
-    {
-        $this->expectExceptionMessage('Invalid format');
-        $data = $this->baseInvoiceData();
-
-        $this->invoiceProcessor->processInvoice($data, self::$conn, 'xml');
     }
 
     // ---- Free shipping  ----
@@ -301,7 +299,7 @@ final class InvoiceProcessorTest extends TestCase
         $data = $this->baseInvoiceData();
         unset($data->customer->address);
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
+        $result = $this->processAndDecode($data, new InvoiceHtmlRenderer());
 
         $this->assertStringContainsString('Jane Smith', $result['output']);
         $this->assertStringNotContainsString('Prinsengracht', $result['output']);
@@ -314,7 +312,7 @@ final class InvoiceProcessorTest extends TestCase
             new LineItem('Sticker', 1, 3.00),
         ]);
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
+        $result = $this->processAndDecode($data, new InvoiceHtmlRenderer());
 
         $this->assertStringContainsString('Shipping:', $result['output']);
         $this->assertStringContainsString('4.95', $result['output']);
@@ -329,7 +327,7 @@ final class InvoiceProcessorTest extends TestCase
             new LineItem('Sticker', 1, 3.00),
         ]);
 
-        $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'text');
+        $result = $this->processAndDecode($data, new InvoiceTextRenderer());
 
         $this->assertStringContainsString('Shipping: ', $result['output']);
     }
