@@ -9,6 +9,7 @@ use App\Domain\Model\Customer;
 use App\Domain\Model\Invoice;
 use App\Domain\Model\LineItem;
 use App\Domain\Service\InvoiceTotalsCalculator;
+use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
 use App\Infrastructure\Repository\MysqliInvoiceRepository;
 use InvalidArgumentException;
 
@@ -54,37 +55,7 @@ final class InvoiceProcessor
 
     private function render(string $format, Invoice $invoice): string {
         if ($format == 'html') {
-            $output = '<div class="invoice">';
-            $output .= '<h1>Invoice ' . $invoice->invoiceNumber . '</h1>';
-            $output .= '<div class="customer">';
-            $output .= '<p>' . htmlspecialchars($invoice->customer->name) . '</p>';
-            $output .= '<p>' . htmlspecialchars($invoice->customer->email) . '</p>';
-            if (isset($invoice->customer->address)) {
-                $output .= '<p>' . nl2br(htmlspecialchars($invoice->customer->address->formatted())) . '</p>';
-            }
-            $output .= '</div>';
-            $output .= '<table class="items">';
-            $output .= '<tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
-            foreach ($invoice->items as $item) {
-                $output .= '<tr>';
-                $output .= '<td>' . htmlspecialchars($item->name) . '</td>';
-                $output .= '<td>' . $item->quantity . '</td>';
-                $output .= '<td>' . number_format($item->unitPrice, 2) . ' EUR</td>';
-                $output .= '<td>' . number_format($item->lineTotal(), 2) . ' EUR</td>';
-                $output .= '</tr>';
-            }
-            $output .= '</table>';
-            $output .= '<div class="totals">';
-            $output .= '<p>Subtotal: ' . number_format($invoice->totals->subtotal, 2) . ' EUR</p>';
-            $output .= '<p>Tax (21%): ' . number_format($invoice->totals->tax, 2) . ' EUR</p>';
-            if ($invoice->totals->shipping > 0) {
-                $output .= '<p>Shipping: ' . number_format($invoice->totals->shipping, 2) . ' EUR</p>';
-            }
-            $output .= '<p class="total"><strong>Total: ' . number_format($invoice->totals->total, 2) . ' EUR</strong></p>';
-            $output .= '</div>';
-            $output .= '</div>';
-
-            return $output;
+            return new InvoiceHtmlRenderer()->render($invoice);
         }
 
         if ($format == 'json') {
