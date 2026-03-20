@@ -17,16 +17,11 @@ final class MysqliInvoiceRepository
      */
     public function save(mysqli $connection, Customer $customer, InvoiceTotals $invoiceTotals, array $items): Invoice
     {
-        $invoiceNumber = $this->generateInvoiceNumber();
+        $invoiceNumber = new DateBasedInvoiceNumberGenerator()->generate();
         $invoiceId = $this->insertInvoice($connection, $invoiceNumber, $customer, $invoiceTotals);
         $this->saveLineItems($connection, $invoiceId, $items);
 
         return new Invoice($invoiceId, $invoiceNumber, $customer, $items, $invoiceTotals);
-    }
-
-    private function generateInvoiceNumber(): string
-    {
-        return 'INV-' . date('Ymd') . '-' . rand(1000, 9999);
     }
 
     private function insertInvoice(mysqli $connection, string $invoiceNumber, Customer $customer, InvoiceTotals $invoiceTotals): int {
