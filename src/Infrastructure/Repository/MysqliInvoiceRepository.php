@@ -8,14 +8,12 @@ use App\Domain\Model\Customer;
 use App\Domain\Model\Invoice;
 use App\Domain\Model\InvoiceTotals;
 use App\Domain\Model\LineItem;
+use App\Domain\Model\LineItemCollection;
 use mysqli;
 
 final class MysqliInvoiceRepository
 {
-    /**
-     * @param list<LineItem> $items
-     */
-    public function save(mysqli $connection, Customer $customer, InvoiceTotals $invoiceTotals, array $items): Invoice
+    public function save(mysqli $connection, Customer $customer, InvoiceTotals $invoiceTotals, LineItemCollection $items): Invoice
     {
         $invoiceNumber = new DateBasedInvoiceNumberGenerator()->generate();
         $invoiceId = $this->insertInvoice($connection, $invoiceNumber, $customer, $invoiceTotals);
@@ -34,10 +32,7 @@ SQL;
         return mysqli_insert_id($connection);
     }
 
-    /**
-     * @param list<LineItem> $items
-     */
-    private function saveLineItems(\mysqli $conn, int $invoiceId, array $items): void
+    private function saveLineItems(\mysqli $conn, int $invoiceId, LineItemCollection $items): void
     {
         foreach ($items as $item) {
             $name = mysqli_real_escape_string($conn, $item->name);

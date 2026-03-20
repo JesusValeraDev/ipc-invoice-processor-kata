@@ -9,6 +9,7 @@ use App\Application\InvoiceProcessor;
 use App\Domain\Model\Address;
 use App\Domain\Model\Customer;
 use App\Domain\Model\LineItem;
+use App\Domain\Model\LineItemCollection;
 use mysqli;
 use PHPUnit\Framework\TestCase;
 
@@ -51,11 +52,11 @@ final class InvoiceProcessorTest extends TestCase
                 email: 'jane.smith@example.com',
                 address: new Address(street: 'Prinsengracht 123', city:  'Amsterdam', zipCode:  '1015 DT'),
             ),
-            items: [
+            items: new LineItemCollection([
                 new LineItem('Mechanical Keyboard', 1, 149.99),
                 new LineItem('USB-C Cable', 3, 12.50),
                 new LineItem('Mouse Pad XL', 1, 24.95),
-            ],
+            ]),
         );
     }
 
@@ -83,7 +84,7 @@ final class InvoiceProcessorTest extends TestCase
         $this->expectExceptionMessage('No items');
 
         $data = $this->baseInvoiceData();
-        $data->items = [];
+        $data->items = new LineItemCollection([]);
 
         $this->invoiceProcessor->processInvoice($data, self::$conn);
     }
@@ -132,9 +133,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_495_when_under_50_and_2_or_fewer_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 1, 3.00),
-        ];
+        ]);
         // subtotal = 3.00, no discount, after_discount = 3.00
         // tax = 3.00 * 0.21 = 0.63
         // item_count = 1 (<=2), shipping = 4.95
@@ -149,10 +150,10 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_695_when_under_50_and_3_to_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker A', 3, 2.00),
             new LineItem('Sticker B', 1, 1.00),
-        ];
+        ]);
         // subtotal = 6.00 + 1.00 = 7.00
         // item_count = 4 (3-5), shipping = 6.95
         // tax = 7.00 * 0.21 = 1.47
@@ -167,9 +168,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_995_when_under_50_and_more_than_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 7, 1.00),
-        ];
+        ]);
         // subtotal = 7.00, item_count = 7 (>5), shipping = 9.95
         // tax = 7.00 * 0.21 = 1.47
         // total = 7.00 + 1.47 + 9.95 = 18.42
@@ -285,9 +286,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_free_shipping_when_exactly_50(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Widget', 1, 50.00),
-        ];
+        ]);
         // after_discount = 50.00, which is NOT < 50, so shipping = 0
 
         $result = $this->processAndDecode($data);
@@ -311,9 +312,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_html_output_shows_shipping_line(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 1, 3.00),
-        ];
+        ]);
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'html');
 
@@ -326,9 +327,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_text_output_shows_shipping_line(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 1, 3.00),
-        ];
+        ]);
 
         $result = $this->invoiceProcessor->processInvoice($data, self::$conn, 'text');
 
@@ -353,9 +354,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_line_item_values_persisted_correctly(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Widget', 2, 15.00),
-        ];
+        ]);
 
         $result = $this->processAndDecode($data);
 
@@ -373,9 +374,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_495_when_exactly_2_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 2, 1.00),
-        ];
+        ]);
         // subtotal = 2.00, item_count = 2 (<=2), shipping = 4.95
 
         $result = $this->processAndDecode($data);
@@ -386,9 +387,9 @@ final class InvoiceProcessorTest extends TestCase
     public function test_shipping_695_when_exactly_5_items(): void
     {
         $data = $this->baseInvoiceData();
-        $data->items = [
+        $data->items = new LineItemCollection([
             new LineItem('Sticker', 5, 1.00),
-        ];
+        ]);
         // subtotal = 5.00, item_count = 5 (<=5), shipping = 6.95
 
         $result = $this->processAndDecode($data);

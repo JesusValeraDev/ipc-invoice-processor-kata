@@ -14,11 +14,11 @@ $invoiceData = new \App\Application\DTO\InvoiceRequest(
         email: 'jane.smith@example.com',
         address: new \App\Domain\Model\Address(street: 'Prinsengracht 123', city: 'Amsterdam', zipCode: '1015 DT'),
     ),
-    items: [
+    items: new \App\Domain\Model\LineItemCollection([
         new \App\Domain\Model\LineItem('Mechanical Keyboard', 1, 149.99),
         new \App\Domain\Model\LineItem('USB-C Cable', 3, 12.50),
         new \App\Domain\Model\LineItem('Mouse Pad XL', 1, 24.95),
-    ],
+    ]),
 );
 
 // Run the demo

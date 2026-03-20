@@ -8,6 +8,7 @@ use App\Application\DTO\InvoiceRequest;
 use App\Domain\Model\Customer;
 use App\Domain\Model\Invoice;
 use App\Domain\Model\LineItem;
+use App\Domain\Model\LineItemCollection;
 use App\Domain\Service\InvoiceTotalsCalculator;
 use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
 use App\Infrastructure\Renderer\InvoiceJsonRenderer;
@@ -41,16 +42,13 @@ final class InvoiceProcessor
         ];
     }
 
-    /**
-     * @param list<LineItem> $items
-     */
-    private function validate(Customer $customer, array $items): void
+    private function validate(Customer $customer, LineItemCollection $items): void
     {
         if (!isset($customer->email) || !filter_var($customer->email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Invalid email');
         }
 
-        if ($items == null || count($items) == 0) {
+        if (count($items) == 0) {
             throw new InvalidArgumentException('No items');
         }
     }

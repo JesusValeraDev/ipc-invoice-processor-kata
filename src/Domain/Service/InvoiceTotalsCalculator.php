@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Service;
 
 use App\Domain\Model\InvoiceTotals;
-use App\Domain\Model\LineItem;
+use App\Domain\Model\LineItemCollection;
 
 final class InvoiceTotalsCalculator
 {
@@ -17,13 +17,10 @@ final class InvoiceTotalsCalculator
     const float SHIPPING_MEDIUM = 6.95;
     const float SHIPPING_LARGE = 9.95;
 
-    /**
-     * @param list<LineItem> $items
-     */
-    public function calculate(array $items): InvoiceTotals
+    public function calculate(LineItemCollection $items): InvoiceTotals
     {
-        $subtotal = $this->calculateSubtotal($items);
-        $itemCount = $this->totalQuantity($items);
+        $subtotal = $items->subtotal();
+        $itemCount = $items->totalQuantity();
         $tax = $this->calculateTax($subtotal);
         $shipping = $this->calculateShipping($subtotal, $itemCount);
 
@@ -35,30 +32,6 @@ final class InvoiceTotalsCalculator
             shipping: round($shipping, 2),
             total: round($total, 2),
             itemCount: $itemCount,
-        );
-    }
-
-    /**
-     * @param list<LineItem> $items
-     */
-    private function calculateSubtotal(array $items): float
-    {
-        return array_reduce(
-            array: $items,
-            callback: fn(float $sum, LineItem $item) => $sum + $item->lineTotal(),
-            initial: 0.0,
-        );
-    }
-
-    /**
-     * @param list<LineItem> $items
-     */
-    private function totalQuantity(array $items): int
-    {
-        return array_reduce(
-            array: $items,
-            callback: fn(int $count, LineItem $item) => $count + $item->quantity,
-            initial: 0,
         );
     }
 
