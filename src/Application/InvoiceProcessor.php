@@ -10,6 +10,7 @@ use App\Domain\Model\Invoice;
 use App\Domain\Model\LineItem;
 use App\Domain\Service\InvoiceTotalsCalculator;
 use App\Infrastructure\Renderer\InvoiceHtmlRenderer;
+use App\Infrastructure\Renderer\InvoiceJsonRenderer;
 use App\Infrastructure\Repository\MysqliInvoiceRepository;
 use InvalidArgumentException;
 
@@ -59,15 +60,7 @@ final class InvoiceProcessor
         }
 
         if ($format == 'json') {
-            return (string) json_encode([
-                'invoice_number' => $invoice->invoiceNumber,
-                'customer' => $invoice->customer,
-                'items' => $invoice->items,
-                'subtotal' => $invoice->totals->subtotal,
-                'tax' => $invoice->totals->tax,
-                'shipping' => $invoice->totals->shipping,
-                'total' => $invoice->totals->total
-            ]);
+            return new InvoiceJsonRenderer()->render($invoice);
         }
 
         if ($format == 'text') {
